@@ -1,6 +1,7 @@
 *.elc
 *~
-history
+/history
+/ac-comphist.dat
 /auto-save-list
 /elpa
 /undo

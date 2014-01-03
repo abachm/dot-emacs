@@ -28,28 +28,14 @@
    magit
    yasnippet
    dropdown-list
-    ;; ace-jump-mode
-    ;; ag
-    ;; auto-complete
-    ;; base16-theme
-    ;; browse-kill-ring
-    ;; clojure-mode
-    ;; company
-    ;; deft
-    ;; diminish
-    ;; dired+
-    ;; evil
-    ;; expand-region
-    ;; flx
-    ;; company
-    ;; git-commit-mode
-    ;; gist
-    ;; multiple-cursors
-    ;; rainbow-delimiters
-    ;; smartparens
-    ;; smex
-    ;; undo-tree 
-    ))
+   js2-mode
+   mmm-mode
+   git-commit-mode
+   gist
+   json-mode
+   jedi
+   python-mode
+   ))
 
 (defun abachm-install-packages ()
   "Install my list of packages."
@@ -175,6 +161,7 @@
  recentf-max-saved-items 100
  redisplay-dont-pause t
  ring-bell-function 'ignore
+ require-final-newline t
  save-place t
  save-place-file "~/.emacs.d/places"
  scroll-conservatively 5
@@ -188,7 +175,7 @@
  split-height-threshold nil
  split-width-threshold 159
  time-stamp-format "%02d-%3b-%:y %02H:%02M:%02S %u"
- tramp-remote-path '(tramp-default-remote-path tramp-own-remote-path "/bin" "/usr/bin" "/usr/sbin" "/usr/local/bin" "/local/bin" "/local/freeware/bin" "/local/gnu/bin" "/usr/freeware/bin" "/usr/pkg/bin" "/usr/contrib/bin")
+ tramp-remote-path '(tramp-default-remote-path tramp-own-remote-path "/bin" "/usr/bin" "/usr/sbin" "/usr/local/bin" "/local/bin")
  undo-tree-history-directory-alist (quote (("." . "~/.emacs.d/undo/")))
  uniquify-buffer-name-style 'forward
  uniquify-ignore-buffers-re "^\\*"
@@ -229,6 +216,7 @@
   (define-key ido-completion-map [tab] 'ido-complete))
 
 (add-hook 'ido-setup-hook 'mp-ido-hook)
+
 
 ;;;; ido-ubiquitous
 (after "ido-ubiquitous-autoloads" (ido-ubiquitous-mode t))
@@ -304,6 +292,19 @@
   (add-hook 'prog-mode-hook 'yas-minor-mode))
 
 
+;;;; js2-mode
+(after "js2-mode-autoloads"
+  (add-to-list 'auto-mode-alist '("\\.js$" . js2-mode)))
+
+;;;; mmm-mode
+(after "mmm-mode-autoloads"
+  (require 'mmm-auto)
+  (setq mmm-global-mode 'maybe)
+  (mmm-add-mode-ext-class 'html-mode "\\.html\\'" 'html-js)
+  (mmm-add-mode-ext-class 'html-mode "\\.html\\'" 'embedded-css)
+  )
+
+
 ;;;; prog-mode
 (defun abachm-buffer-enable-whitespace-cleanup ()
   "enable whitespace-cleanup in the current buffer"
@@ -317,6 +318,14 @@
 
 (add-hook 'prog-mode-hook 'abachm-buffer-enable-whitespace-cleanup)
 (add-hook 'prog-mode-hook 'whitespace-mode)
+
+
+;;;; python-mode
+
+;;;; jedi (python autocomplete mode)
+(add-hook 'python-mode-hook 'jedi:setup)
+(setq jedi:setup-keys t)                      ; optional
+(setq jedi:complete-on-dot t)                 ; optional
 
 
 ;;;; functions
