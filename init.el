@@ -35,6 +35,7 @@
    json-mode
    jedi
    python-mode
+   color-theme-solarized
    ))
 
 (defun abachm-install-packages ()
@@ -54,8 +55,10 @@
   `(eval-after-load ,mode
      '(progn ,@body)))
 
+
 ;;;; aliases
 (defalias 'yes-or-no-p 'y-or-n-p)
+
 
 ;;;; PowerLine Setup
 (require 'powerline)
@@ -63,6 +66,12 @@
 (powerline-reset)
 (powerline-default-theme)
 
+
+;;;; Color Theme Setup
+(require 'color-theme)
+(color-theme-initialize)
+(setq color-theme-is-global t)
+(color-theme-solarized-dark)
 
 ;;;; External libraries
 (require 'checkdoc)
