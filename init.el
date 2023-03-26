@@ -1,434 +1,684 @@
-;;; init.el --- abachm configuration file
-
-;; Turn off mouse interface early in startup to avoid momentary display
-;(when (fboundp 'menu-bar-mode) (menu-bar-mode -1))
-(when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
-(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
-
-;; No splash screen please... jeez
+;;; No splash screen please... jeez
 (setq inhibit-startup-screen t)
 
 ;;;; package.el
 (require 'package)
 (setq package-user-dir "~/.emacs.d/elpa/")
+(setq package-enable-at-startup nil)
+
 (add-to-list 'package-archives
-             '("marmalade" . "http://marmalade-repo.org/packages/") t)
+             '("melpa" . "https://melpa.org/packages/") t)
 (add-to-list 'package-archives
-             '("melpa" . "http://melpa.milkbox.net/packages/") t)
+             '("nongnu" . "https://elpa.nongnu.org/nongnu/") t)
 (add-to-list 'package-archives
-             '("quasi-melpa" . "http://quasi.milkbox.net/packages/") t)
+             '("org" . "http://orgmode.org/elpa/") t) ; Org-mode's repository
+
 (package-initialize)
 
-(defvar abachm-packages
-  '(
-   powerline
-   ido-ubiquitous
-   ido-vertical-mode
-   find-file-in-project
-   magit
-   yasnippet
-   dropdown-list
-   js2-mode
-   mmm-mode
-   git-commit-mode
-   gist
-   json-mode
-   jedi
-   python-mode
-   color-theme-solarized
-   ))
 
-(defun abachm-install-packages ()
-  "Install my list of packages."
-  (interactive)
+;; Bootstrap `use-package'
+(unless (package-installed-p 'use-package)
   (package-refresh-contents)
-  (mapc #'(lambda (package)
-            (unless (package-installed-p package)
-              (package-install package)))
-        abachm-packages))
+  (package-install 'use-package))
 
+(eval-when-compile
+  (require 'use-package))
 
-;;;; macros
-(defmacro after (mode &rest body)
-  "`eval-after-load' MODE evaluate BODY."
-  (declare (indent defun))
-  `(eval-after-load ,mode
-     '(progn ,@body)))
+(setq-default
+ max-lisp-eval-depth 1000
+ locale-coding-system 'utf-8
+ read-process-output-max (* 1024 1024)
+ user-full-name "Anders Madsen"
+ user-mail-address "anders@uber.com")
 
+;; load path
+(defun emacs-d (path)
+  (let ((user-dir
+         (cond ((boundp 'user-init-dir) user-init-dir)  ; check if user-init-dir is defined
+               ((boundp 'user-emacs-directory) user-emacs-directory) ; else if user-emacs-directory is defined
+               (t "~/.emacs.d/")))) ; else default
+    (concat user-dir path)))
 
-;;;; aliases
+;; aliases
 (defalias 'yes-or-no-p 'y-or-n-p)
 
+;; Better defaults
+(use-package better-defaults
+  :ensure t)
 
-;;;; PowerLine Setup
-(require 'powerline)
-(setq powerline-default-separator 'butt)
-(powerline-reset)
-(powerline-default-theme)
+(use-package all-the-icons
+  :ensure t)
 
-
-;;;; Color Theme Setup
-(require 'color-theme)
-(color-theme-initialize)
-(setq color-theme-is-global t)
-(color-theme-solarized-dark)
-
-;;;; External libraries
-(require 'checkdoc)
-(require 'midnight)
-(require 'misc)
-(require 'recentf)
-(require 'saveplace)
-(require 'uniquify)
+(use-package doom-themes
+  :ensure t
+  :config
+  ;; Global settings (defaults)
+  (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+        doom-themes-enable-italic t) ; if nil, italics is universally disabled
+  (load-theme 'doom-material t)
 
 
-;;;; random number generator
-(random t)
+  ;; Enable custom neotree theme (all-the-icons must be installed!)
+  (doom-themes-neotree-config)
 
-;;;; Auto insert mode enabled
-(auto-insert-mode t)
+  ;; Corrects (and improves) org-mode's native fontification.
+  (doom-themes-org-config))
+
+(use-package doom-modeline
+      :ensure t
+      :hook (after-init . doom-modeline-mode))
+
+;; Windmove
+(use-package windmove
+  :bind (("C-x <left>" . windmove-left)
+	 ("C-x <right>" . windmove-right)
+	 ("C-x <up>" . windmove-up)
+	 ("C-x <down>" . windmove-down))
+  )
+
+;; cua-mode
+(use-package cua-base
+  :init (cua-mode 1))
+
+;; protobuf-mode
+(use-package protobuf-mode
+  :ensure t
+  :mode ("\\.proto\\'" . protobuf-mode)
+  :config
+  (defconst my-protobuf-style
+    '((c-basic-offset . 2)
+      (indent-tabs-mode . nil)))
+
+  (add-hook 'protobuf-mode-hook
+            (lambda () (c-add-style "my-style" my-protobuf-style t))))
+
+(use-package toml-mode
+  :ensure t
+  :mode ("\\.toml\\'" . toml-mode))
+
+(use-package json-mode
+  :ensure t
+  :mode (("\\.json\\'" . json-mode)
+         ("\\.tmpl\\'" . json-mode))
+  :config (setq-default js-indent-level 2))
+
+(use-package graphql-mode
+  :ensure t)
+
+(use-package jq-format
+  :ensure t
+  :after json-mode)
+
+(use-package dockerfile-mode
+  :ensure t
+  :mode ("Dockerfile\\'" . dockerfile-mode))
+
+;; markdown
+(use-package markdownfmt
+  :ensure t)
+
+(use-package markdown-mode
+  :ensure t
+  :mode (("\\.md$"        . markdown-mode)
+         ("\\.mkd$"       . markdown-mode)
+         ("\\.markdown$"  . markdown-mode)
+         ("\\bREADME$$"   . markdown-mode))
+  :config
+  (add-hook 'markdown-mode-hook #'markdownfmt-enable-on-save))
+
+;; magit
+(use-package magit
+  :ensure t
+  :bind (("C-x g" . magit-status)))
+
+(use-package git-modes
+  :ensure t)
+
+;; yaml-mode
+(use-package yaml-mode
+  :ensure t
+  :mode (("\\.yaml$" . yaml-mode)
+         ("\\.yml$" . yaml-mode))
+  :config
+  (add-hook 'yaml-mode-hook #'(lambda ()
+                                (define-key yaml-mode-map "\C-m" 'newline-and-indent))))
+
+(use-package yaml-pro
+  :ensure t
+  :config
+  (add-hook 'yaml-mode-hook #'yaml-pro-mode))
+
+;; ivy, swiper and counsel
+(use-package ivy
+  :ensure t
+  :config
+  (ivy-mode 1)
+  (setq ivy-use-virtual-buffers t)
+  (setq enable-recursive-minibuffers t)
+  (setq ivy-count-format "(%d/%d) ")
+  :bind (("C-c C-r" . ivy-resume)))
+
+(use-package swiper
+  :ensure t
+  :bind (("C-s" . swiper)))
+
+(use-package counsel
+  :ensure t
+  :bind (("M-x" . counsel-M-x)
+         ("C-x C-f" . counsel-find-file)
+         ("<f1> f" . counsel-describe-function)
+         ("<f1> v" . counsel-describe-variable)
+         ("<f1> l" . counsel-find-library)
+         ("<f2> i" . counsel-info-lookup-symbol)
+         ("<f2> u" . counsel-unicode-char)
+         ("C-c g" . counsel-git)
+         ("C-c j" . counsel-git-grep)
+         ("C-c a" . counsel-ag)
+         ("C-x l" . counsel-locate))
+  :config
+  (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history))
+
+;; projectile
+(use-package projectile
+  :ensure t
+  :init
+  (setq projectile-completion-system 'ivy)
+  :config
+  (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+  (projectile-mode +1))
+
+(use-package counsel-projectile
+  :ensure t
+  :config
+  (counsel-projectile-mode))
+
+(use-package yasnippet
+  :ensure t
+  :commands yas-minor-mode
+  :hook (go-mode . yas-minor-mode))
+
+(use-package lsp-mode
+  :ensure t
+  :init
+  (setq lsp-keymap-prefix "C-c l")
+  (setq lsp-go-use-gofumpt t)
+  ;; uncomment to enable gopls http debug server
+  ;; :custom (lsp-gopls-server-args '("-debug" "127.0.0.1:0"))
+  :commands (lsp lsp-deferred)
+  :config (progn
+            ;; use flycheck, not flymake
+            (setq lsp-diagnostics-provider :flycheck)
+            (setq lsp-enable-file-watchers nil)))
+
+;; optional - provides fancy overlay information
+(use-package lsp-ui
+  :ensure t
+  :commands lsp-ui-mode
+  :config (progn
+            ;; disable inline documentation
+            (setq lsp-ui-sideline-enable nil)
+            ;; disable showing docs on hover at the top of the window
+            (setq lsp-ui-doc-enable nil))
+  )
+
+(use-package lsp-ivy
+  :ensure t
+  :commands lsp-ivy-workspace-symbol)
+
+(use-package company
+  :ensure t
+  :defer t
+  :diminish (company-mode . " ⓐ")
+  :init
+  (global-company-mode)
+  :config
+  (setq company-tooltip-align-annotations t
+        company-idle-delay 0.2
+        ;; min prefix of 2 chars
+        company-minimum-prefix-length 2
+        company-show-numbers 1
+        company-require-match nil)
+  ;; math
+  (use-package company-math
+    :ensure t
+    :defer t
+    :config
+    (defun enable-math()
+      (setq-local company-backends
+                  (append '((company-math-symbols-latex company-latex-commands))
+                          company-backends)))
+    (add-hook 'text-mode-hook 'enable-math))
+  )
+
+;; snippets
+(use-package yasnippet
+  :ensure t
+  :defer t
+  :diminish yas-minor-mode
+  :bind ((:map yas-keymap
+               ("C-a" . my-yas/goto-start-of-active-field)
+               ("C-e" . my-yas/goto-end-of-active-field)
+               ;; Use C-t to expand snippet instead of conflicting <TAB>
+               ("C-t" . yas-next-field-or-maybe-expand)
+               ("C-T" . yas-next-field))
+         (:map yas-minor-mode-map
+               ("C-c C-y a" . yas-reload-all)))
+  :init
+  ;; set snippet directory
+  (setq yas-snippet-dirs (list (emacs-d "snippets")))
+  ;; turn on yasnippet everywhere
+  (yas-global-mode 1)
+  (yas-reload-all)
+  :config
+  ;; options
+  (setq yas-indent-line 'fixed)
+  (setq yas-verbosity 1)
+  (setq yas-wrap-around-region t)
+  :custom
+  (add-hook 'company-mode-hook
+            (lambda ()
+              (substitute-key-definition
+               'company-complete-common
+               'company-yasnippet-or-completion
+               company-active-map))))
+
+(defun company-yasnippet-or-completion ()
+  "Solve company yasnippet conflicts."
+  (interactive)
+  (let ((yas-fallback-behavior
+         (apply 'company-complete-common nil)))
+    (yas-expand)))
+
+(defun my-yas/goto-end-of-active-field ()
+  (interactive)
+  (let* ((snippet (car (yas--snippets-at-point)))
+         (position (yas--field-end (yas--snippet-active-field snippet))))
+    (if (= (point) position)
+        (move-end-of-line 1)
+      (goto-char position))))
+
+(defun my-yas/goto-start-of-active-field ()
+  (interactive)
+  (let* ((snippet (car (yas--snippets-at-point)))
+         (position (yas--field-start (yas--snippet-active-field snippet))))
+    (if (= (point) position)
+        (move-beginning-of-line 1)
+      (goto-char position))))
+
+;; auto-yasnippet
+;; hybrid of keyboard macro and yasnippet
+(use-package auto-yasnippet
+  :ensure t
+  :commands (aya-create aya-expand)
+  :bind (("C-c ~" . aya-create)
+         ("C-c C-~" . aya-expand)))
 
 
-;;;; hooks
-(add-hook 'write-file-functions 'time-stamp)
+(use-package go-mode
+  :ensure t
+  :preface
+  (defun go-mode-config ()
+    (whitespace-toggle-options '(tabs))
+    (setq tab-width 2
+          indent-tabs-mode 1)
+    )
+  (defun go-organize-imports ()
+    (interactive)
+    (if (and (string-prefix-p "~/projects/go-code/" (abbreviate-file-name (buffer-file-name))) (string= (file-name-extension buffer-file-name) "go"))
+      (let ((gofmt-command "go-code-goimports"))
+        (gofmt))
+    (lsp-organize-imports)))
+  :config
+  (add-hook 'go-mode-hook (lambda () (go-mode-config)))
+  :bind (
+         ;; If you want to switch existing go-mode bindings to use lsp-mode/gopls instead
+         ;; uncomment the following lines
+         ;; ("C-c C-j" . lsp-find-definition)
+         ;; ("C-c C-d" . lsp-describe-thing-at-point)
+         )
+  :hook ((go-mode . lsp-deferred)
+         (before-save . lsp-format-buffer)
+         (before-save . go-organize-imports)))
 
+(use-package gotest
+  :ensure t
+  :bind
+  (:map go-mode-map
+        ("C-c ."   . go-test-current-test)
+        ("C-c f"   . go-test-current-file)
+        ("C-c a"   . go-test-current-project)))
 
-;;;; generic
+(use-package bazel
+  :ensure t)
+
+(use-package go-tag
+  :ensure t
+  :config (setq go-tag-args (list "-transform" "camelcase")))
+
+(use-package editorconfig
+  :ensure t
+  :config
+  (editorconfig-mode 1))
+
+(use-package autorevert
+  :config
+  (setq auto-revert-interval 1)
+  (global-auto-revert-mode))
+
+(use-package whitespace
+  :init
+  (dolist (hook '(prog-mode-hook text-mode-hook))
+    (add-hook hook #'whitespace-mode))
+  (add-hook 'before-save-hook #'whitespace-cleanup)
+  :config
+  (setq whitespace-line-column 180) ;; limit line length
+  (setq whitespace-style '(face trailing tabs lines empty indentaion::space)))
+
+(use-package elpy
+  :ensure t
+  :defer t
+  :init
+  (advice-add 'python-mode :before 'elpy-enable)
+  :config
+  (use-package py-isort
+    :ensure t)
+  (add-hook 'elpy-mode-hook
+            (lambda ()
+              (add-hook 'before-save-hook 'py-isort-before-save)
+              )
+            )
+  (setq elpy-rpc-backend "jedi")
+  (setq elpy-modules '(elpy-module-company
+                       elpy-module-eldoc
+                       elpy-module-pyvenv
+                       elpy-module-yasnippet
+                       elpy-module-sane-defaults)))
+
+(use-package code-cells
+  :ensure t)
+
+(use-package flycheck
+  :ensure t
+  :init
+  (global-flycheck-mode)
+  :config
+  (flycheck-add-mode 'javascript-eslint 'web-mode)
+  (setq-default flycheck-disabled-checkers
+                (append flycheck-disabled-checkers
+                      '(javascript-jshint json-jsonlist)))
+  )
+
+;; default modes
+(use-package org
+  :ensure t
+  :mode ("\\\.org\\\'" . org-mode)
+;  :init
+;  (setq initial-major-mode 'org-mode)
+;  (setq org-startup-indented t)
+;  (setq org-hide-leading-stars t)
+;  (setq org-indent-indentation-per-level 2)
+;  (setq org-startup-folded 'content)
+;  :config
+;  (setq-default major-mode 'org-mode)
+;  (setq org-blank-before-new-entry '((heading . nil)
+;                                     (plain-list-item . auto)))
+;  ;; tag column
+;  (setq org-tags-column -70)
+;  ;; dependencies
+;  (setq org-enforce-todo-dependencies t)
+;  ;; make clock history persistent
+;  (setq org-clock-persist 'history)
+;  ;; Todo states
+;  (setq org-todo-keywords
+;        '((sequence "TODO(t)" "|" "WAITING(w)" "DONE(d)")))
+;  (setq org-use-fast-todo-selection t)  ; C-c C-<char>
+;  ;; priorities
+;  (setq org-default-priority 67) ;C
+;  ;; highlight math
+;  (setf org-highlight-latex-and-related '(latex entities))
+;
+;  ;; Allow alphabetical lists
+;  (setq org-alphabetical-lists t)
+;
+;  (defun my-org-metacontrolreturn ()
+;    "Execute `org-meta-return' followed by `org-meta-right'.
+;This usually makes new item indented one level deeper."
+;    (interactive)
+;    (org-meta-return)
+;    (org-metaright))
+;  (bind-key "<C-M-return>" 'my-org-metacontrolreturn) ; Decide whether useful only in org-mode
+;
+;  (defun my-org-make-numbered-list (beg end)
+;    (interactive (if (use-region-p)
+;                     (list (region-beginning) (region-end))
+;                   (list
+;                    (save-excursion (outline-previous-heading) (forward-line) (point))
+;                    (save-excursion (outline-next-heading) (forward-line -1) (point)))))
+;    (string-rectangle beg end "- ")
+;    (beginning-of-line)
+;    (org-call-with-arg 'org-cycle-list-bullet 'previous)
+;    (org-call-with-arg 'org-cycle-list-bullet 'previous))
+;
+;  ;; org keys
+;  (org-defkey org-mode-map (kbd "C-c 1") 'my-org-make-numbered-list)
+;  (org-defkey org-mode-map (kbd "C-c x") 'org-export-dispatch)
+;  ;; shortcut for C-u C-c C-l
+;  (defun org-insert-file-link () (interactive) (org-insert-link '(4)))
+;  (org-defkey org-mode-map (kbd "C-c l") 'org-store-link)
+;
+;  ;; some templates
+;  (setcdr (assoc "c" org-structure-template-alist)
+;          '("#+BEGIN_COMMENT\n?\n#+END_COMMENT"))
+;  (add-to-list 'org-structure-template-alist
+;               '("r"
+;                 "#+BEGIN_SRC go\n?\n#+END_SRC"
+;                 "<src lang=\"go\">\n\n</src>"))
+;  (add-to-list 'org-structure-template-alist
+;               '("p"
+;                 "#+BEGIN_SRC python\n?\n#+END_SRC"
+;                 "<src lang=\"python\">\n\n</src>"))
+;
+;  (setq org-default-notes-file "~/TODO.org")
+;
+;  ;; From scimax
+;  ;; default with images open
+;  (setq org-startup-with-inline-images "inlineimages")
+;  ;; * Fragment overlays
+;  (defun org-latex-fragment-tooltip (beg end image imagetype)
+;    "Add the fragment tooltip to the overlay and set click function to toggle it."
+;    (overlay-put (ov-at) 'help-echo
+;                 (concat (buffer-substring beg end)
+;                         "\nmouse-1 to toggle."))
+;    (overlay-put (ov-at) 'local-map (let ((map (make-sparse-keymap)))
+;                                      (define-key map [mouse-1]
+;                                        `(lambda ()
+;                                           (interactive)
+;                                           (org-remove-latex-fragment-image-overlays ,beg ,end)))
+;                                      map)))
+;
+;  (advice-add 'org--format-latex-make-overlay :after 'org-latex-fragment-tooltip)
+;  (defun org-latex-fragment-justify (justification)
+;    "Justify the latex fragment at point with JUSTIFICATION.
+;JUSTIFICATION is a symbol for 'left, 'center or 'right."
+;    (interactive
+;     (list (intern-soft
+;            (completing-read "Justification (left): " '(left center right)
+;                             nil t nil nil 'left))))
+;
+;    (let* ((ov (ov-at))
+;           (beg (ov-beg ov))
+;           (end (ov-end ov))
+;           (shift (- beg (line-beginning-position)))
+;           (img (overlay-get ov 'display))
+;           (img (and (and img (consp img) (eq (car img) 'image)
+;                          (image-type-available-p (plist-get (cdr img) :type)))
+;                     img))
+;           space-left offset)
+;      (when (and img (= beg (line-beginning-position)))
+;        (setq space-left (- (window-max-chars-per-line) (car (image-display-size img)))
+;              offset (floor (cond
+;                             ((eq justification 'center)
+;                              (- (/ space-left 2) shift))
+;                             ((eq justification 'right)
+;                              (- space-left shift))
+;                             (t
+;                              0))))
+;        (when (>= offset 0)
+;          (overlay-put ov 'before-string (make-string offset ?\ ))))))
+;
+;  (defun org-latex-fragment-justify-advice (beg end image imagetype)
+;    "After advice function to justify fragments."
+;    (org-latex-fragment-justify (or (plist-get org-format-latex-options :justify) 'left)))
+;
+;  (advice-add 'org--format-latex-make-overlay :after 'org-latex-fragment-justify-advice)
+;
+;  ;; ** numbering latex equations
+;  (defun org-renumber-environment (orig-func &rest args)
+;    "A function to inject numbers in LaTeX fragment previews."
+;    (let ((results '())
+;          (counter -1)
+;          (numberp))
+;
+;      (setq results (loop for (begin .  env) in
+;                          (org-element-map (org-element-parse-buffer) 'latex-environment
+;                            (lambda (env)
+;                              (cons
+;                               (org-element-property :begin env)
+;                               (org-element-property :value env))))
+;                          collect
+;                          (cond
+;                           ((and (string-match "\\\\begin{equation}" env)
+;                                 (not (string-match "\\\\tag{" env)))
+;                            (incf counter)
+;                            (cons begin counter))
+;                           ((string-match "\\\\begin{align}" env)
+;                            (prog2
+;                                (incf counter)
+;                                (cons begin counter)
+;                              (with-temp-buffer
+;                                (insert env)
+;                                (goto-char (point-min))
+;                                ;; \\ is used for a new line. Each one leads to a number
+;                                (incf counter (count-matches "\\\\$"))
+;                                ;; unless there are nonumbers.
+;                                (goto-char (point-min))
+;                                (decf counter (count-matches "\\nonumber")))))
+;                           (t
+;                            (cons begin nil)))))
+;
+;      (when (setq numberp (cdr (assoc (point) results)))
+;        (setf (car args)
+;              (concat
+;               (format "\\setcounter{equation}{%s}\n" numberp)
+;               (car args)))))
+;
+;    (apply orig-func args))
+;
+;  (advice-add 'org-create-formula-image :around #'org-renumber-environment)
+;
+;  (use-package org-bullets
+;    :ensure t
+;    :commands (org-bullets-mode)
+;    :init (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1))))
+  )
+
+;(use-package org-modern
+;  :ensure t
+;  :config
+;  (add-hook 'org-mode-hook #'org-modern-mode)
+;  )
+
+(use-package org-superstar
+  :ensure t
+  :config
+  (add-hook 'org-mode-hook #'org-superstar-mode)
+  )
+
+(use-package neotree
+  :ensure t
+  :bind ("<f8>" . 'neotree-toggle)
+  :init
+  ;; Every time when the neotree window is opened, let it find current file and jump to node
+  (setq neo-smart-open t)
+  ;; set icons theme
+  (setq neo-theme (if (display-graphic-p) 'nerd 'arrow))
+  ;; show hidden files
+  (setq-default neo-show-hidden-files t))
+
+; web-mode with js/html/css
+
+(use-package web-mode
+  :ensure t
+  :mode (("\\.jsx?$" . web-mode)
+         ("\\.html$" . web-mode))
+  :hook (web-mode . lsp-deferred)
+  :init
+  (setq web-mode-markup-indent-offset 2)
+  (setq web-mode-code-indent-offset 2)
+  (setq web-mode-css-indent-offset 2)
+  (setq js-indent-level 2)
+  (setq web-mode-enable-auto-pairing t)
+  (setq web-mode-enable-auto-expanding t)
+  (setq web-mode-enable-css-colorization t)
+  (setq web-mode-content-types-alist '(("jsx" . "\\.js[x]?\\'")))
+  (add-hook 'web-mode-hook 'electric-pair-mode)
+  )
+
+(use-package emmet-mode
+  :diminish (emmet-mode . "ε")
+  :bind* (("C-)" . emmet-next-edit-point)
+          ("C-(" . emmet-prev-edit-point))
+  :commands (emmet-mode
+             emmet-next-edit-point
+             emmet-prev-edit-point)
+  :init
+  (setq emmet-indentation 2)
+  (setq emmet-move-cursor-between-quotes t)
+  :config
+  ;; Auto-start on any markup modes
+  (add-hook 'sgml-mode-hook 'emmet-mode)
+  (add-hook 'web-mode-hook 'emmet-mode))
+
+(use-package add-node-modules-path
+  :ensure t
+  :config
+  (add-hook 'flycheck-mode-hook 'add-node-modules-path)
+  )
+
+(use-package prettier-js
+  :ensure t)
+
+(use-package chemtable
+  :ensure t)
+
+;; Customizations
+
+(menu-bar-mode t)
 (column-number-mode t)
-(recentf-mode t)
-(savehist-mode t)
 (show-paren-mode t)
-(visual-line-mode -1)
-(winner-mode t)
-(global-subword-mode t)
 (delete-selection-mode t)
 (set-terminal-coding-system 'utf-8)
 (set-keyboard-coding-system 'utf-8)
 (set-selection-coding-system 'utf-8)
 (prefer-coding-system 'utf-8)
-(which-function-mode t)
 
-
-;;;; the uncustomizable
-(setq-default
- ansi-color-faces-vector [default bold shadow italic underline bold bold-italic bold]
- ansi-color-for-comint-mode t
- ansi-color-names-vector ["#242424" "#e5786d" "#95e454" "#cae682" "#8ac6f2" "#333366" "#ccaa8f" "#f6f3e8"]
- auto-revert-verbose nil
- auto-save-file-name-transforms (quote ((".*" "~/.emacs.d/autosave/" t)))
- backup-directory-alist (quote (("." . "~/.emacs.d/backups/")))
- backward-delete-char-untabify-method nil
- browse-url-generic-program "firefox"
- browse-url-browser-function 'browse-url-generic
- blink-matching-paren-on-screen t
- c-hungry-delete-key t
- c-default-style "bsd"
- coffee-tab-width 2
- custom-theme-directory "~/.emacs.d/themes/"
- delete-auto-save-files nil
- diff-switches "-u"
- dired-use-ls-dired nil
- echo-keystrokes 0.1
- ediff-split-window-function 'split-window-horizontally
- ediff-window-setup-function 'ediff-setup-windows-plain
- enable-recursive-minibuffers t
- flymake-gui-warnings-enabled t
- fringe-indicator-alist '((truncation left-arrow right-arrow)
-                          (continuation nil right-curly-arrow)
-                          (overlay-arrow . right-triangle)
-                          (up . up-arrow)
-                          (down . down-arrow)
-                          (top top-left-angle top-right-angle)
-                          (bottom bottom-left-angle bottom-right-angle top-right-angle top-left-angle)
-                          (top-bottom left-bracket right-bracket top-right-angle top-left-angle)
-                          (empty-line . empty-line)
-                          (unknown . question-mark))
- font-lock-maximum-decoration t
- global-auto-revert-non-file-buffers t
- global-font-lock-mode t
- ibuffer-expert t
- ibuffer-show-empty-filter-groups nil
- imenu-auto-rescan t
- indent-tabs-mode nil
- indicate-empty-lines t
- ispell-extra-args (quote ("--sug-mode=ultra"))
- ispell-program-name "aspell"
- kill-whole-line t
- line-spacing 0
- locale-coding-system 'utf-8
- mode-line-in-non-selected-windows t
- mode-line-inverse-video t
- mouse-wheel-scroll-amount (quote (0.01))
- mouse-yank-at-point t
- next-line-add-newlines nil
- ns-alternate-modifier (quote super)
- ns-command-modifier (quote meta)
- ns-function-modifier (quote hyper)
- ns-pop-up-frames nil
- ns-tool-bar-display-mode 'both
- ns-tool-bar-size-mode 'regular
- recentf-max-saved-items 100
- redisplay-dont-pause t
- ring-bell-function 'ignore
- require-final-newline t
- save-place t
- save-place-file "~/.emacs.d/places"
- scroll-conservatively 5
- scroll-margin 5
- scroll-step 1
- send-mail-function (quote mailclient-send-it)
- sentence-end-double-space nil
- set-mark-command-repeat-pop t
- shift-select-mode nil
- show-paren-style 'mixed
- split-height-threshold nil
- split-width-threshold 159
- time-stamp-format "%02d-%3b-%:y %02H:%02M:%02S %u"
- tramp-remote-path '(tramp-default-remote-path tramp-own-remote-path "/bin" "/usr/bin" "/usr/sbin" "/usr/local/bin" "/local/bin")
- undo-tree-history-directory-alist (quote (("." . "~/.emacs.d/undo/")))
- uniquify-buffer-name-style 'forward
- uniquify-ignore-buffers-re "^\\*"
- uniquify-separator " • "
- user-full-name "Anders Bach Madsen"
- user-mail-address "anders@bachmadsen.net"
- visible-bell nil
- whitespace-style (quote (face trailing tabs lines empty indentaion::space)) ;; '(face tabs trailing lines-tail newline indentation empty space-after-tab)
- whitespace-line-column 89)
-
-
-;;;; auto revert
-(autoload 'auto-revert-mode "autorevert" nil t)
-(autoload 'turn-on-auto-revert-mode "autorevert" nil nil)
-(autoload 'global-auto-revert-mode "autorevert" nil t)
-(global-auto-revert-mode t)
-
-
-;;;; ido
-(ido-mode t)
-(ido-everywhere t)
-(setq ido-enable-flex-matching t)
-(setq ido-auto-merge-work-directories-length -1)
-(setq ido-create-new-buffer 'always)
-(setq ido-everywhere t)
-(setq ido-max-prospects 10)
-(setq ido-read-file-name-non-ido nil)
-(setq ido-use-filename-at-point nil)
-(setq ido-use-virtual-buffers t)
-
-(global-set-key (kbd "C-x f") 'find-file-in-project)
-(define-key ctl-x-4-map (kbd "f") 'find-file-in-project-other-window)
-(define-key ctl-x-4-map (kbd "s") 'shell-other-window)
-
-(defun mp-ido-hook ()
-  (define-key ido-completion-map (kbd "C-h") 'ido-delete-backward-updir)
-  (define-key ido-completion-map (kbd "C-w") 'ido-delete-backward-word-updir)
-  (define-key ido-completion-map [tab] 'ido-complete))
-
-(add-hook 'ido-setup-hook 'mp-ido-hook)
-
-
-;;;; ido-ubiquitous
-(after "ido-ubiquitous-autoloads" (ido-ubiquitous-mode t))
-
-
-;;;; ido-vertical-mode
-(after "ido-vertical-mode-autoloads"
-  (ido-vertical-mode t))
-
-
-;;;; find-file-in-project
-(after 'find-file-in-project
-  (add-to-list 'ffip-patterns "*.c")
-  (add-to-list 'ffip-patterns "*.java")
-  (add-to-list 'ffip-patterns "*.xml")
-  (add-to-list 'ffip-patterns "*.py")
-  (add-to-list 'ffip-patterns "*.less")
-  (add-to-list 'ffip-patterns "*.coffee")
-  (add-to-list 'ffip-patterns "*.css")
-  (add-to-list 'ffip-patterns "*.h"))
-
-
-;;;; magit
-(global-set-key (kbd "C-x g") 'magit-status)
-
-(defun magit-toggle-whitespace ()
-  (interactive)
-  (if (member "-w" magit-diff-options)
-      (magit-dont-ignore-whitespace)
-    (magit-ignore-whitespace)))
-
-(defun magit-ignore-whitespace ()
-  (interactive)
-  (add-to-list 'magit-diff-options "-w")
-  (magit-refresh))
-
-(defun magit-dont-ignore-whitespace ()
-  (interactive)
-  (setq magit-diff-options (remove "-w" magit-diff-options))
-  (magit-refresh))
-
-(defun magit-quit-session ()
-  "Restore the previous window configuration and kill the magit buffer."
-  (interactive)
-  (kill-buffer)
-  (jump-to-register :magit-fullscreen))
-
-(after 'magit
-  (define-key magit-status-mode-map (kbd "W") 'magit-toggle-whitespace)
-  (define-key magit-status-mode-map (kbd "q") 'magit-quit-session)
-
-  ;; full screen magit-status
-  (defadvice magit-status (around magit-fullscreen activate)
-    (window-configuration-to-register :magit-fullscreen)
-    ad-do-it
-    (delete-other-windows)))
-
-
-;;;; ispell
-(setq ispell-list-command "list")
-
-
-;;;; diff commands
-(add-to-list 'command-switch-alist '("-diff" . command-line-diff))
-
-
-;;;; yas/snippets
-(after 'yasnippet
-  (yas/reload-all)
-  (setq yas/prompt-functions '(yas/ido-prompt yas/completing-prompt yas/no-prompt)))
-
-(after "yasnippet-autoloads"
-  (add-hook 'prog-mode-hook 'yas-minor-mode))
-
-
-;;;; js2-mode
-(after "js2-mode-autoloads"
-  (add-to-list 'auto-mode-alist '("\\.js$" . js2-mode)))
-
-;;;; mmm-mode
-(after "mmm-mode-autoloads"
-  (require 'mmm-auto)
-  (setq mmm-global-mode 'maybe)
-  (mmm-add-mode-ext-class 'html-mode "\\.html\\'" 'html-js)
-  (mmm-add-mode-ext-class 'html-mode "\\.html\\'" 'embedded-css)
-  )
-
-
-;;;; prog-mode
-(defun abachm-buffer-enable-whitespace-cleanup ()
-  "enable whitespace-cleanup in the current buffer"
-  (interactive)
-  (add-hook 'before-save-hook 'whitespace-cleanup nil t))
-
-(defun abachm-buffer-disable-whitespace-cleanup ()
-  "enable whitespace-cleanup in the current buffer"
-  (interactive)
-  (remove-hook 'before-save-hook 'whitespace-cleanup t))
-
-(add-hook 'prog-mode-hook 'abachm-buffer-enable-whitespace-cleanup)
-(add-hook 'prog-mode-hook 'whitespace-mode)
-
-
-;;;; python-mode
-
-;;;; jedi (python autocomplete mode)
-(add-hook 'python-mode-hook 'jedi:setup)
-(setq jedi:setup-keys t)                      ; optional
-(setq jedi:complete-on-dot t)                 ; optional
-
-
-;;;; functions
-
-(defun other-window-reverse ()
-  "Select the other window but in reverse."
-  (interactive)
-  (other-window -1))
-
-(defun shell-other-window (&optional buffer)
-  (interactive
-   (list
-    (and current-prefix-arg
-         (prog1
-             (read-buffer "Shell buffer: "
-                          (generate-new-buffer-name "*shell*"))
-           (if (file-remote-p default-directory)
-               ;; It must be possible to declare a local default-directory.
-               ;; FIXME: This can't be right: it changes the default-directory
-               ;; of the current-buffer rather than of the *shell* buffer.
-               (setq default-directory
-                     (expand-file-name
-                      (read-directory-name
-                       "Default directory: " default-directory default-directory
-                       t nil))))))))
-  (let ((buffer (save-window-excursion
-                  (shell buffer))))
-    (switch-to-buffer-other-window buffer)))
-
-(defun find-file-in-project-other-window ()
-  "Find a file in the current project in the other window."
-  (interactive)
-  (let ((buffer (save-window-excursion (find-file-in-project))))
-    (switch-to-buffer-other-window buffer)))
-
-;;; customizations
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(cua-mode t nil (cua-base))
- '(display-time-mode t)
- '(LaTeX-command "latex --shell-escape ")
- '(TeX-PDF-mode t)
- '(TeX-output-view-style (quote (("^dvi$" ("^landscape$" "^pstricks$\\|^pst-\\|^psfrag$") "%(o?)dvips -t landscape %d -o && gv %f") ("^dvi$" "^pstricks$\\|^pst-\\|^psfrag$" "%(o?)dvips %d -o && gv %f") ("^dvi$" ("^\\(?:a4\\(?:dutch\\|paper\\|wide\\)\\|sem-a4\\)$" "^landscape$") "%(o?)xdvi %dS -paper a4r -s 0 %d") ("^dvi$" "^\\(?:a4\\(?:dutch\\|paper\\|wide\\)\\|sem-a4\\)$" "%(o?)xdvi %dS -paper a4 %d") ("^dvi$" ("^\\(?:a5\\(?:comb\\|paper\\)\\)$" "^landscape$") "%(o?)xdvi %dS -paper a5r -s 0 %d") ("^dvi$" "^\\(?:a5\\(?:comb\\|paper\\)\\)$" "%(o?)xdvi %dS -paper a5 %d") ("^dvi$" "^b5paper$" "%(o?)xdvi %dS -paper b5 %d") ("^dvi$" "^letterpaper$" "%(o?)xdvi %dS -paper us %d") ("^dvi$" "^legalpaper$" "%(o?)xdvi %dS -paper legal %d") ("^dvi$" "^executivepaper$" "%(o?)xdvi %dS -paper 7.25x10.5in %d") ("^dvi$" "." "%(o?)xdvi %dS %d") ("^pdf$" "." "evince %o %(outpage)") ("^html?$" "." "firefox %o"))))
- '(ansi-term-color-vector [unspecified "#081724" "#ff694d" "#68f6cb" "#fffe4e" "#bad6e2" "#afc0fd" "#d2f1ff" "#d3f9ee"])
- '(background-color "#202020")
- '(background-mode dark)
- '(cursor-color "#cccccc")
- '(custom-enabled-themes (quote (mustang)))
- '(custom-safe-themes (quote ("6e05b0a83b83b5efd63c74698e1ad6feaddf69a50b15a8b4a83b157aac45127c" "de2c46ed1752b0d0423cde9b6401062b67a6a1300c068d5d7f67725adc6c3afb" "9bac44c2b4dfbb723906b8c491ec06801feb57aa60448d047dbfdbd1a8650897" "1affe85e8ae2667fb571fc8331e1e12840746dae5c46112d5abb0c3a973f5f5a" "41b6698b5f9ab241ad6c30aea8c9f53d539e23ad4e3963abff4b57c0f8bf6730" "e53cc4144192bb4e4ed10a3fa3e7442cae4c3d231df8822f6c02f1220a0d259a" "c7359bd375132044fe993562dfa736ae79efc620f68bab36bd686430c980df1c" "f220c05492910a305f5d26414ad82bf25a321c35aa05b1565be12f253579dec6" "d0ff5ea54497471567ed15eb7279c37aef3465713fb97a50d46d95fe11ab4739" "dc46381844ec8fcf9607a319aa6b442244d8c7a734a2625dac6a1f63e34bc4a6" "29a4267a4ae1e8b06934fec2ee49472daebd45e1ee6a10d8ff747853f9a3e622" "e26780280b5248eb9b2d02a237d9941956fc94972443b0f7aeec12b5c15db9f3" "978bd4603630ecb1f01793af60beb52cb44734fc14b95c62e7b1a05f89b6c811" "1f3304214265481c56341bcee387ef1abb684e4efbccebca0e120be7b1a13589" "1cf3f29294c5a3509b7eb3ff9e96f8e8db9d2d08322620a04d862e40dc201fe2" "9ea054db5cdbd5baa4cda9d373a547435ba88d4e345f4b06f732edbc4f017dc3" "f48b43277382ee56a9e3c5d08b71c3639f401f6338da00039dcac3c21c0811b5" "b1e54397de2c207e550dc3a090844c4b52d1a2c4a48a17163cce577b09c28236" "bad832ac33fcbce342b4d69431e7393701f0823a3820f6030ccc361edd2a4be4" "7d090d4b15e530c28a35e084700aca464291264aad1fa2f2b6bba33dd2e92fd5" "b674ccba78eb688bea71ea8a1fd2782fcd69bd462e2504008903b5b6e018b480" "0c311fb22e6197daba9123f43da98f273d2bfaeeaeb653007ad1ee77f0003037" "af5f7d472ffeed85823d563512ce95e8ff7d648d8217d9ab79b17ae601b9a9d5" "7fa9dc3948765d7cf3d7a289e40039c2c64abf0fad5c616453b263b601532493" "e57e7b19da7b4cd0e5512d5e9bc20d31c9cf50112c462de15a76bce0ea3c5ef5" "75d4ccc5e912b93f722e57cca3ca1a15e079032cd69fd9bc67268b4c85639663" "d971315c813b0269a86e7c5e73858070063016d9585492bd8d0f27704d50fee7" "450b29ed22abeeac279b7eeea592f4eea810105737716fc29807e1684e729c55" "1278386c1d30fc24b4248ba69bc5b49d92981c3476de700a074697d777cb0752" "d7f1c86b425e148be505c689fc157d96323682c947b29ef00cf57b4e4e46e6c7" "9f42bccce1e13fa5017eb8718574db099e85358b9f424db78e7318f86d1be08f" "5339210234ec915d7d3fd87bfeb506bfc436ff7277a55516ab1781ec85c57224" "eacfc96fbe418c017f4a00fdde5d5029db8e2800a46251eb2174484fa431917e" "3bd9497fb8f39c28ab58a9e957152ba2dc41223c23c5520ef10fc7bd6b222384" "fa189fcf5074d4964f0a53f58d17c7e360bb8f879bd968ec4a56dc36b0013d29" "47583b577fb062aeb89d3c45689a4f2646b7ebcb02e6cb2d5f6e2790afb91a18" "98522c31200ec2ee2c84ae3dddac94e69730650096c3f4f751be4beece0f6781" "eef383086ae1f47f75cda814adfb9868a3dafa99b6eb67fdff780a52d326d468" "7153b82e50b6f7452b4519097f880d968a6eaf6f6ef38cc45a144958e553fbc6" "a0feb1322de9e26a4d209d1cfa236deaf64662bb604fa513cca6a057ddf0ef64" "465be5317c7d95a84e376e095c21242f4f2ad75692ed806dcbb6fe27078260f1" "f24462e7d2dcc5a7c6767ffc25cab208e6e3a963682b62bb2526eceb3899fff8" "f0283ec7a2385af8ea0fbb1466f340bbd0b2cededa60831394ec94e98096e1a8" "1d10043a0318d90a71cfa1f7e6b3b67f77c16ff9854f35a5b8722d87cb74f580" "b8f561a188a77e450ab8a060128244c81dea206f15c1152a6899423dd607b327" "1c1e6b2640daffcd23b1f7dd5385ca8484a060aec901b677d0ec0cf2927f7cde" "1a093e45e4c3e86fa5ad1f8003660e7cda4d961cd5d377cee3fee2dad2faf19b" "78cfbd96775588c06c4fff22573aaa5fa762ca2b8eda43cb964b7739194ed3c1" "88d556f828e4ec17ac074077ef9dcaa36a59dccbaa6f2de553d6528b4df79cbd" "76b9b3780c4844712e4a3ab05b8669eecd56a3864aae29e54005ffc68c24414c" "bb1eaf74fcfa24c8868078cac73abba4138d0ddb7f11f44d7e8f849edbf8b912" "383806d341087214fd44864170161c6bf34a41e866f501d1be51883e08cb674b" "a68fa33e66a883ce1a5698bc6ff355b445c87da1867fdb68b9a7325ee6ea3507" "466ae54a7b157ad02fd91da72b7871bccfb9bac98fdab95cf7a0d405c8572bd0" "88b663861db4767f7881e5ecff9bb46d65161a20e40585c8128e8bed8747dae5" "77bd459212c0176bdf63c1904c4ba20fce015f730f0343776a1a14432de80990" "c1fb68aa00235766461c7e31ecfc759aa2dd905899ae6d95097061faeb72f9ee" "446c73cdfb49f1dab4c322e51ac00a536fb0e3cb7e6809b9f4616e0858012e92" "9562e9eb5fd01677ac6b76b66f9a81338991fa9d270270802eeae5232c8da0a6" "6f3060ac8300275c990116794e1ba897b6a8af97c51a0cb226a98759752cddcf" "7feeed063855b06836e0262f77f5c6d3f415159a98a9676d549bfeb6c49637c4" default)))
- '(fci-rule-character-color "#192028")
- '(fci-rule-color "#444444")
- '(foreground-color "#cccccc")
- '(frame-brackground-mode (quote dark))
- '(fringe-mode (quote (4 . 0)) nil (fringe))
- '(indicate-buffer-boundaries (quote left))
- '(linum-format " %7i ")
- '(overflow-newline-into-fringe t)
- '(safe-local-variable-values (quote ((eval when (and (buffer-file-name) (file-regular-p (buffer-file-name)) (string-match-p "^[^.]" (buffer-file-name))) (emacs-lisp-mode) (when (fboundp (quote flycheck-mode)) (flycheck-mode -1)) (unless (featurep (quote package-build)) (let ((load-path (cons ".." load-path))) (require (quote package-build)))) (package-build-minor-mode)) (eval when (and (buffer-file-name) (file-regular-p (buffer-file-name)) (string-match-p "^[^.]" (buffer-file-name))) (emacs-lisp-mode) (unless (featurep (quote package-build)) (let ((load-path (cons ".." load-path))) (require (quote package-build)))) (package-build-minor-mode)))))
- '(vc-annotate-background monokai-bg)
- '(vc-annotate-color-map (quote ((20 . monokai-fg-1) (40 . monokai-bg+2) (60 . monokai-red) (80 . monokai-red+1) (100 . monokai-orange) (120 . monokai-orange+1) (140 . monokai-green) (160 . monokai-green+1) (180 . monokai-yellow) (200 . monokai-yellow+1) (220 . monokai-blue) (240 . monokai-blue+1) (260 . monokai-purple) (280 . monokai-purple+1) (300 . monokai-cyan) (320 . monokai-cyan+1) (340 . monokai-magenta) (360 . monokai-magenta+1))))
- '(vc-annotate-very-old-color monokai-magenta)
- '(grep-command "grep -nir ")
- '(grep-find-command (quote ("find . -type f -exec grep -nH -e  {} +" . 34)))
- '(grep-find-template "find . <X> -type f <F> -exec grep <C> -nH -e <R> {} +")
- '(grep-highlight-matches (quote auto))
- '(grep-template "grep <X> <C> -nH -e <R> <F>")
- '(grep-use-null-device nil)
- '(printer-name "aar-cups01")
- '(python-guess-indent nil)
- '(python-indent 3)
- '(python-indent-guess-indent-offset nil)
- '(python-indent-offset 3)
  '(blink-cursor-mode nil)
-)
+ '(grep-command "grep -nir ")
+ '(org-table-convert-region-max-lines 100000)
+ '(package-selected-packages '(py-isort org-bullets org-pdfview gotest use-package)))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:family "Source Code Pro" :foundry "adobe" :slant normal :weight normal :height 98 :width normal)))))
+ '(default ((t (:family "JuliaMono" :foundry "UKWN" :slant normal :weight normal :height 95 :width normal)))))
 
-(put 'narrow-to-region 'disabled nil)
-(put 'downcase-region 'disabled nil)
 
-(when (file-exists-p "~/.emacs.d/local.el")
-  (load-file "~/.emacs.d/local.el"))
-
+(provide 'init)
 ;;; init.el ends here
-
-;; Local Variables:
-;; time-stamp-start: "Updated: +"
-;; time-stamp-end: "$"
-;; End:
